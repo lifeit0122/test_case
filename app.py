@@ -5,6 +5,7 @@ import pandas as pd
 import time
 from flask_caching import Cache
 import plotly.express as px
+from datetime import datetime
 
 # Replace with your actual scalar value columns
 scalar_columns = ["value1", "value2", "value3"]
@@ -68,6 +69,8 @@ app.layout = html.Div([
 ])
 
 # Initialize ISO dropdown and time slider
+from datetime import datetime
+
 @app.callback(
     Output("iso-dropdown", "options"),
     Output("time-slider", "min"),
@@ -86,14 +89,19 @@ def init_controls(_):
         if len(time_list) < 2:
             return iso_options, 0, 1, [0, 1], {0: "0", 1: "1"}
 
-        min_idx = 0
-        max_idx = len(time_list) - 1
+        timestamps = [int(t.timestamp()) for t in time_list]
         marks = {
-            i: time_list[i].strftime("%m-%d %H:%M")
-            for i in range(0, len(time_list), max(1, len(time_list) // 6))
+            int(t.timestamp()): t.strftime("%m-%d %H:%M")
+            for t in time_list[::max(1, len(time_list) // 6)]
         }
 
-        return iso_options, min_idx, max_idx, [min_idx, max_idx], marks
+        return (
+            iso_options,
+            min(timestamps),
+            max(timestamps),
+            [min(timestamps), max(timestamps)],
+            marks
+        )
 
     except Exception as e:
         print("Slider init error:", e)
@@ -121,9 +129,12 @@ def update_outputs(selected_iso, time_range):
     if len(time_list) == 0:
         return [], [], [], {}, ""
 
-    end_idx = min(time_range[1], len(time_list) - 1)
-    selected_times = time_list[time_range[0]:end_idx + 1]
-    df_selected = df_sorted[df_sorted.index.isin(selected_times)]
+# Convert slider value (timestamps) to datetime
+    start_ts = datetime.fromtimestamp(time_range[0])
+    end_ts = datetime.fromtimestamp(time_range[1])
+
+    df_selected = df_sorted[(df_sorted.index >= start_ts) & (df_sorted.index <= end_ts)]
+
 
     if df_selected.empty or "Asset" not in df_selected.columns:
         return [], [], [], {}, ""
@@ -151,7 +162,7 @@ def update_outputs(selected_iso, time_range):
     )
 
     # Format time label
-    time_label = f"Showing data from {selected_times[0].strftime('%Y-%m-%d %H:%M')} to {selected_times[-1].strftime('%Y-%m-%d %H:%M')}"
+    time_label = f"Showing data from {start_ts.strftime('%Y-%m-%d %H:%M')} to {end_ts.strftime('%Y-%m-%d %H:%M')}"
 
     return table_data, table_columns, table_styles, fig, time_label
 
