@@ -10,10 +10,10 @@ from datetime import datetime
 # Replace with your actual scalar value columns
 scalar_columns = ["value1", "value2", "value3"]
 
-# Initialize app and cache
 app = dash.Dash(__name__)
 server = app.server
 
+# Cache setup
 cache = Cache(app.server, config={
     'CACHE_TYPE': 'SimpleCache',
     'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24  # 24 hours
@@ -28,7 +28,7 @@ def load_large_dataset():
     df.index = pd.to_datetime(df.index)
     return df
 
-# Heatmap-style coloring logic
+# Heatmap-style background coloring
 def generate_heatmap_styles(df, columns):
     styles = []
     for col in columns:
@@ -44,7 +44,7 @@ def generate_heatmap_styles(df, columns):
             })
     return styles
 
-# App layout
+# Layout
 app.layout = html.Div([
     html.H2("ISO Heatmap Viewer"),
     dcc.Dropdown(id="iso-dropdown", placeholder="Select ISO"),
@@ -68,9 +68,7 @@ app.layout = html.Div([
     dcc.Graph(id="heatmap-graph")
 ])
 
-# Initialize ISO dropdown and time slider
-from datetime import datetime
-
+# Initialize ISO dropdown and timestamp-based slider
 @app.callback(
     Output("iso-dropdown", "options"),
     Output("time-slider", "min"),
@@ -124,22 +122,17 @@ def update_outputs(selected_iso, time_range):
     df = load_large_dataset()
     df = df[df["ISO"] == selected_iso]
     df_sorted = df.sort_index()
-    time_list = df_sorted.index.unique()
 
-    if len(time_list) == 0:
-        return [], [], [], {}, ""
-
-# Convert slider value (timestamps) to datetime
+    # Convert slider values (timestamps) to datetimes
     start_ts = datetime.fromtimestamp(time_range[0])
     end_ts = datetime.fromtimestamp(time_range[1])
 
     df_selected = df_sorted[(df_sorted.index >= start_ts) & (df_sorted.index <= end_ts)]
 
-
     if df_selected.empty or "Asset" not in df_selected.columns:
         return [], [], [], {}, ""
 
-    # Group by Asset and format to 2 decimals
+    # Group and format table
     grouped_avg = df_selected.groupby("Asset")[scalar_columns].mean().reset_index()
     table_data = grouped_avg.copy()
     table_data[scalar_columns] = table_data[scalar_columns].round(2)
@@ -147,7 +140,7 @@ def update_outputs(selected_iso, time_range):
     table_columns = [{"name": col, "id": col} for col in grouped_avg.columns]
     table_styles = generate_heatmap_styles(grouped_avg, scalar_columns)
 
-    # Create heatmap figure
+    # Plotly heatmap
     grouped_avg_fig = grouped_avg.set_index("Asset")
     fig = px.imshow(
         grouped_avg_fig,
@@ -157,15 +150,15 @@ def update_outputs(selected_iso, time_range):
     )
     fig.update_layout(
         title=f"Averaged Heatmap for ISO: {selected_iso}<br>"
-              f"{selected_times[0].strftime('%m-%d %H:%M')} → {selected_times[-1].strftime('%m-%d %H:%M')}",
+              f"{start_ts.strftime('%Y-%m-%d %H:%M')} → {end_ts.strftime('%Y-%m-%d %H:%M')}",
         xaxis_tickangle=-45
     )
 
-    # Format time label
+    # Time window label
     time_label = f"Showing data from {start_ts.strftime('%Y-%m-%d %H:%M')} to {end_ts.strftime('%Y-%m-%d %H:%M')}"
 
     return table_data, table_columns, table_styles, fig, time_label
 
-# Run the app
+# Run app
 if __name__ == '__main__':
     app.run_server(debug=True)
