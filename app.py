@@ -34,7 +34,8 @@ def generate_heatmap_styles(df, columns):
         col_max = df[col].max()
         for i, val in enumerate(df[col]):
             norm = (val - col_min) / (col_max - col_min + 1e-6)
-            color = f"rgba({255 * (1 - norm):.0f}, {255 * norm:.0f}, 100, 0.8)"
+            # Gradient from light to dark blue
+            color = f"rgba({int(255 * norm)}, {int(255 * norm)}, 255, 0.85)"
             styles.append({
                 "if": {"row_index": i, "column_id": col},
                 "backgroundColor": color,
@@ -127,8 +128,12 @@ def update_outputs(selected_iso, time_range):
 
     grouped_avg = df_selected.groupby("Asset")[scalar_columns].mean().reset_index()
 
+    table_data = grouped_avg.copy()
+    table_data[scalar_columns] = table_data[scalar_columns].round(2)
+    table_data = table_data.to_dict("records")
+
     # Table setup
-    table_data = grouped_avg.to_dict("records")
+    # table_data = grouped_avg.to_dict("records")
     table_columns = [{"name": col, "id": col} for col in grouped_avg.columns]
     table_styles = generate_heatmap_styles(grouped_avg, scalar_columns)
 
