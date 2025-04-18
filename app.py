@@ -34,27 +34,6 @@ app.layout = html.Div([
     dcc.Graph(id="heatmap-graph")
 ])
 
-# Populate ISO dropdown and time slider
-@app.callback(
-    Output("iso-dropdown", "options"),
-    Output("time-slider", "min"),
-    Output("time-slider", "max"),
-    Output("time-slider", "value"),
-    Output("time-slider", "marks"),
-    Input("iso-dropdown", "id")  # dummy input to trigger at load
-)
-def init_controls(_):
-    df = load_large_dataset()
-    df.index = pd.to_datetime(df.index)
-    iso_options = [{"label": iso, "value": iso} for iso in df["ISO"].unique()]
-    df_sorted = df.sort_index()
-    time_list = df_sorted.index.unique()
-    min_idx = 0
-    max_idx = len(time_list) - 1
-    marks = {i: time_list[i].strftime("%m-%d %H:%M") for i in range(0, len(time_list), len(time_list) // 6 or 1)}
-    return iso_options, min_idx, max_idx, [min_idx, max_idx], marks
-
-# Generate heatmap
 @app.callback(
     Output("heatmap-graph", "figure"),
     Input("iso-dropdown", "value"),
@@ -63,28 +42,41 @@ def init_controls(_):
 def update_heatmap(selected_iso, time_range):
     if selected_iso is None or time_range is None:
         return {}
+
     df = load_large_dataset()
     df.index = pd.to_datetime(df.index)
     df = df[df["ISO"] == selected_iso]
     df_sorted = df.sort_index()
     time_list = df_sorted.index.unique()
-    selected_times = time_list[time_range[0]:time_range[1]+1]
+
+    # Guard against index overflow
+    if time_range[1] >= len(time_list):
+        time_range[1] = len(time_list) - 1
+
+    selected_times = time_list[time_range[0]:time_range[1] + 1]
     df_selected = df_sorted[df_sorted.index.isin(selected_times)]
 
-    if df_selected.empty:
+    if df_selected.empty or "Asset" not in df_selected.columns:
         return {}
 
-    # Create heatmap-style DataFrame
-    df_plot = df_selected[scalar_columns].copy()
-    df_plot["Time"] = df_selected.index.strftime("%m-%d %H:%M")
-    df_plot = df_plot.set_index("Time").T
+    # Group by Asset and calculate mean of scalar columns
+    grouped_avg = df_selected.groupby("Asset")[scalar_columns].mean()
 
-    fig = px.imshow(df_plot,
-                    labels=dict(x="Time", y="Variables", color="Value"),
-                    aspect="auto",
-                    color_continuous_scale="Viridis")
-    fig.update_layout(title=f"Heatmap for ISO: {selected_iso}", xaxis_tickangle=-45)
+    # Assets as rows, scalar columns as columns (no transpose needed)
+    fig = px.imshow(
+        grouped_avg,
+        labels=dict(x="Variables", y="Asset", color="Avg Value"),
+        aspect="auto",
+        color_continuous_scale="Viridis"
+    )
+
+    fig.update_layout(
+        title=f"Averaged Heatmap (Assets as rows) for ISO: {selected_iso}<br>{selected_times[0].strftime('%m-%d %H:%M')} → {selected_times[-1].strftime('%m-%d %H:%M')}",
+        xaxis_tickangle=-45
+    )
+
     return fig
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)
