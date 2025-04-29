@@ -49,24 +49,29 @@ app.layout = html.Div([
     html.H2("ISO Heatmap Viewer"),
 
     html.Div([
-        html.Div([
-            dcc.Dropdown(id="iso-dropdown", placeholder="Select ISO")
-        ], style={"flex": "1", "padding": "5px"}),
+    html.Div([
+        dcc.Dropdown(id="iso-dropdown", placeholder="Select ISO")
+    ], style={"flex": "1", "padding": "5px"}),
 
-        html.Div([
-            dcc.Dropdown(id="client-dropdown", placeholder="Select Client")
-        ], style={"flex": "1", "padding": "5px"}),
+    html.Div([
+        dcc.Dropdown(id="client-dropdown", placeholder="Select Client")
+    ], style={"flex": "1", "padding": "5px"}),
 
-        html.Div([
-            dcc.Dropdown(id="duration-dropdown", placeholder="Select Duration")
-        ], style={"flex": "1", "padding": "5px"}),
-    ], style={"display": "flex", "flexDirection": "row"}),
+    html.Div([
+        dcc.Dropdown(id="duration-dropdown", placeholder="Select Duration")
+    ], style={"flex": "1", "padding": "5px"}),
+], style={"display": "flex", "flexDirection": "row"}),
 
-    dcc.RangeSlider(
-        id="time-slider",
-        step=1,
-        tooltip={"placement": "bottom", "always_visible": True}
-    ),
+    html.Div([
+        dcc.RangeSlider(
+            id="time-slider",
+            step=86400,  # 1 day
+            tooltip={"placement": "bottom", "always_visible": True},
+            style={"height": "30px"}  # <--- Thicker slider
+        )
+    ], style={"marginTop": "20px"}),
+
+
     html.Br(),
 
     html.H4("Average Table by Asset"),
