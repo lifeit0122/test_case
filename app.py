@@ -35,7 +35,7 @@ def generate_heatmap_styles(df, columns):
         col_min = df[col].min()
         col_max = df[col].max()
         for i, val in enumerate(df[col]):
-            norm = (val - col_min) / (col_max - col_min + 1e-6)
+            norm = (val - col_min) / (col_max - col_min + 1e-6) if col_max != col_min else 0.5
             color = f"rgba({int(255 * norm)}, {int(255 * norm)}, 255, 0.85)"  # gradient blue
             styles.append({
                 "if": {"row_index": i, "column_id": col},
@@ -47,15 +47,31 @@ def generate_heatmap_styles(df, columns):
 # Layout
 app.layout = html.Div([
     html.H2("ISO Heatmap Viewer"),
-    dcc.Dropdown(id="iso-dropdown", placeholder="Select ISO"),
+
+    html.Div([
+        html.Div([
+            dcc.Dropdown(id="iso-dropdown", placeholder="Select ISO")
+        ], style={"flex": "1", "padding": "5px"}),
+
+        html.Div([
+            dcc.Dropdown(id="client-dropdown", placeholder="Select Client")
+        ], style={"flex": "1", "padding": "5px"}),
+
+        html.Div([
+            dcc.Dropdown(id="duration-dropdown", placeholder="Select Duration")
+        ], style={"flex": "1", "padding": "5px"}),
+    ], style={"display": "flex", "flexDirection": "row"}),
+
     dcc.RangeSlider(
         id="time-slider",
         step=1,
         tooltip={"placement": "bottom", "always_visible": True}
     ),
     html.Br(),
+
     html.H4("Average Table by Asset"),
     html.Div(id="time-range-display", style={"fontWeight": "bold", "marginTop": "1em"}),
+
     dash_table.DataTable(
         id="heatmap-table",
         style_cell={"textAlign": "center"},
@@ -64,28 +80,36 @@ app.layout = html.Div([
         data=[], columns=[]
     ),
     html.Br(),
+
     html.H4("Heatmap Visualization"),
     dcc.Graph(id="heatmap-graph")
 ])
 
-# Initialize ISO dropdown and timestamp-based slider
+# Initialize dropdown options and time slider
 @app.callback(
     Output("iso-dropdown", "options"),
+    Output("client-dropdown", "options"),
+    Output("duration-dropdown", "options"),
     Output("time-slider", "min"),
     Output("time-slider", "max"),
     Output("time-slider", "value"),
     Output("time-slider", "marks"),
-    Input("iso-dropdown", "id")
+    Input("iso-dropdown", "id")  # dummy trigger
 )
 def init_controls(_):
     try:
         df = load_large_dataset()
+
         iso_options = [{"label": iso, "value": iso} for iso in df["ISO"].unique()]
+        client_options = [{"label": client, "value": client} for client in df["Client"].unique()]
+        duration_options = [{"label": f"{duration:.2f}", "value": float(duration)}
+                            for duration in sorted(df["Duration"].dropna().unique())]
+
         df_sorted = df.sort_index()
         time_list = df_sorted.index.unique()
 
         if len(time_list) < 2:
-            return iso_options, 0, 1, [0, 1], {0: "0", 1: "1"}
+            return iso_options, client_options, duration_options, 0, 1, [0, 1], {0: "0", 1: "1"}
 
         timestamps = [int(t.timestamp()) for t in time_list]
         marks = {
@@ -95,6 +119,8 @@ def init_controls(_):
 
         return (
             iso_options,
+            client_options,
+            duration_options,
             min(timestamps),
             max(timestamps),
             [min(timestamps), max(timestamps)],
@@ -103,7 +129,7 @@ def init_controls(_):
 
     except Exception as e:
         print("Slider init error:", e)
-        return [], 0, 1, [0, 1], {0: "0", 1: "1"}
+        return [], [], [], 0, 1, [0, 1], {0: "0", 1: "1"}
 
 # Update table, figure, and time range label
 @app.callback(
@@ -113,17 +139,27 @@ def init_controls(_):
     Output("heatmap-graph", "figure"),
     Output("time-range-display", "children"),
     Input("iso-dropdown", "value"),
+    Input("client-dropdown", "value"),
+    Input("duration-dropdown", "value"),
     Input("time-slider", "value")
 )
-def update_outputs(selected_iso, time_range):
-    if selected_iso is None or time_range is None:
+def update_outputs(selected_iso, selected_client, selected_duration, time_range):
+    if time_range is None:
         return [], [], [], {}, ""
 
     df = load_large_dataset()
-    df = df[df["ISO"] == selected_iso]
+
+    # Apply filters if selected
+    if selected_iso:
+        df = df[df["ISO"] == selected_iso]
+    if selected_client:
+        df = df[df["Client"] == selected_client]
+    if selected_duration is not None:
+        df = df[df["Duration"] == selected_duration]
+
     df_sorted = df.sort_index()
 
-    # Convert slider values (timestamps) to datetimes
+    # Convert slider values (timestamps) to datetime
     start_ts = datetime.fromtimestamp(time_range[0])
     end_ts = datetime.fromtimestamp(time_range[1])
 
@@ -149,8 +185,7 @@ def update_outputs(selected_iso, time_range):
         color_continuous_scale="Viridis"
     )
     fig.update_layout(
-        title=f"Averaged Heatmap for ISO: {selected_iso}<br>"
-              f"{start_ts.strftime('%Y-%m-%d %H:%M')} → {end_ts.strftime('%Y-%m-%d %H:%M')}",
+        title=f"Averaged Heatmap<br>{start_ts.strftime('%Y-%m-%d %H:%M')} → {end_ts.strftime('%Y-%m-%d %H:%M')}",
         xaxis_tickangle=-45
     )
 
