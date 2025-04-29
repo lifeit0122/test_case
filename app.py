@@ -48,29 +48,30 @@ def generate_heatmap_styles(df, columns):
 app.layout = html.Div([
     html.H2("ISO Heatmap Viewer"),
 
+    # Dropdowns side by side
     html.Div([
-    html.Div([
-        dcc.Dropdown(id="iso-dropdown", placeholder="Select ISO")
-    ], style={"flex": "1", "padding": "5px"}),
+        html.Div([
+            dcc.Dropdown(id="iso-dropdown", placeholder="Select ISO")
+        ], style={"flex": "1", "padding": "5px"}),
 
-    html.Div([
-        dcc.Dropdown(id="client-dropdown", placeholder="Select Client")
-    ], style={"flex": "1", "padding": "5px"}),
+        html.Div([
+            dcc.Dropdown(id="client-dropdown", placeholder="Select Client")
+        ], style={"flex": "1", "padding": "5px"}),
 
-    html.Div([
-        dcc.Dropdown(id="duration-dropdown", placeholder="Select Duration")
-    ], style={"flex": "1", "padding": "5px"}),
-], style={"display": "flex", "flexDirection": "row"}),
+        html.Div([
+            dcc.Dropdown(id="duration-dropdown", placeholder="Select Duration")
+        ], style={"flex": "1", "padding": "5px"}),
+    ], style={"display": "flex", "flexDirection": "row"}),
 
+    # Slider with margin and thicker height
     html.Div([
         dcc.RangeSlider(
             id="time-slider",
-            step=86400,  # 1 day
+            step=86400,  # 1 day step
             tooltip={"placement": "bottom", "always_visible": True},
-            style={"height": "30px"}  # <--- Thicker slider
+            style={"height": "30px"}
         )
     ], style={"marginTop": "20px"}),
-
 
     html.Br(),
 
@@ -90,7 +91,7 @@ app.layout = html.Div([
     dcc.Graph(id="heatmap-graph")
 ])
 
-# Initialize dropdown options and time slider
+# Initialize dropdown options and slider
 @app.callback(
     Output("iso-dropdown", "options"),
     Output("client-dropdown", "options"),
@@ -118,7 +119,7 @@ def init_controls(_):
 
         timestamps = [int(t.timestamp()) for t in time_list]
         marks = {
-            int(t.timestamp()): t.strftime("%m-%d %H:%M")
+            int(t.timestamp()): t.strftime("%m-%d")
             for t in time_list[::max(1, len(time_list) // 6)]
         }
 
@@ -164,7 +165,7 @@ def update_outputs(selected_iso, selected_client, selected_duration, time_range)
 
     df_sorted = df.sort_index()
 
-    # Convert slider values (timestamps) to datetime
+    # Convert slider timestamps to datetime
     start_ts = datetime.fromtimestamp(time_range[0])
     end_ts = datetime.fromtimestamp(time_range[1])
 
