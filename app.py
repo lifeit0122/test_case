@@ -137,6 +137,18 @@ def init_controls(_):
         print("Slider init error:", e)
         return [], [], [], 0, 1, [0, 1], {0: "0", 1: "1"}
 
+@app.callback(
+    Output("time-slider", "value"),
+    Input("date-dropdown", "value"),
+    Input("time-slider", "value"),
+    prevent_initial_call=True
+)
+def sync_date_dropdown(selected_date, current_slider_range):
+    if selected_date is None:
+        return current_slider_range
+    return [selected_date, selected_date]
+
+
 # Update table, figure, and time range label
 @app.callback(
     Output("heatmap-table", "data"),
